@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using MinhaPrimeiraApi.Models;
-using Microsoft.EntityFrameworkCore;
-using MinhaPrimeiraApi.Data;
+using MinhaPrimeiraApi.Services;
 
 namespace MinhaPrimeiraApi.Controllers;
 
@@ -10,31 +9,31 @@ namespace MinhaPrimeiraApi.Controllers;
 [Route("api/[controller]")]
 public class ProdutosController : ControllerBase
 {
-    private readonly AppDbContext _context;
-    
-    public ProdutosController(AppDbContext context)
+
+    private readonly IProdutoService _service;
+    public ProdutosController(IProdutoService service)
     {
-        _context = context;
+        _service = service;
     }
 
     [HttpGet]
     public async Task<IActionResult> ListarTodos()
     {
-        var produtos = await _context.Produtos.ToListAsync();
+        var produtos = await _service.ListarTodosAsync();
         return Ok(produtos);
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> BuscarPorId(int id)
     {
-        if(id <=0)
+        if (id <= 0)
         {
             return BadRequest("O id do produto deve ser maior que zero.");
         }
-       
-       var produto = await _context.Produtos.FindAsync(id);
 
-        if(produto == null)
+        var produto = await _service.BuscarPorIdAsync(id);
+
+        if (produto == null)
         {
             return NotFound($"Produto com id {id} não encontrado.");
         }
@@ -44,52 +43,50 @@ public class ProdutosController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Criar([FromBody] Produto produto)
     {
-        if(!ModelState.IsValid)
+        if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        _context.Produtos.Add(produto);
-        await _context.SaveChangesAsync();
-        return Ok($"Produto '{produto.Nome}' criado com sucesso.");
-    }
-
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Atualizar (int id, [FromBody] Produto produtoAtualizado)
-    {
-        if(!ModelState.IsValid)
+        try
         {
-            return BadRequest(ModelState);
+            var criado = await _service.CriarAsync(produto);
+            return CreatedAtAction(nameof(BuscarPorId), new { id = criado.Id }, criado);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
         }
 
-        var produtoExistente = await _context.Produtos.FindAsync(id);
-
-        if(produtoExistente == null)
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Atualizar(int id, [FromBody] Produto produtoAtualizado)
         {
-            return NotFound($"Produto com id {id} não encontrado.");
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var produtoExistente = await _service.AtualizarAsync(id, produtoAtualizado);
+
+            if (produtoExistente == null)
+            {
+                return NotFound($"Produto com id {id} não encontrado.");
+            }
+
+            return Ok($"Produto com id {id} atualizado com sucesso.");
         }
 
-        produtoExistente.Nome = produtoAtualizado.Nome;
-        produtoExistente.Preco = produtoAtualizado.Preco;
-
-        await _context.SaveChangesAsync();
-      
-        return Ok($"Produto com id {id} atualizado com sucesso.");
-    }
-
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Deletar(int id)
-    {
-        var produtoExistente = await _context.Produtos.FindAsync(id);
-
-        if(produtoExistente == null)
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Deletar(int id)
         {
-            return NotFound($"Produto com id {id} não encontrado.");
+            var removido = await _service.RemoverAsync(id);
+
+            if (!removido)
+            {
+                return NotFound($"Produto com id {id} não encontrado.");
+            }
+
+            return NoContent();
         }
-
-        _context.Produtos.Remove(produtoExistente);
-        await _context.SaveChangesAsync();
-
-        return Ok($"Produto com id {id} deletado com sucesso.");
     }
 }

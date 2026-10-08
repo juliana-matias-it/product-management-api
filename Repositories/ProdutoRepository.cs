@@ -33,7 +33,7 @@ public class ProdutoRepository : IProdutoRepository
     public async Task<Produto?> AtualizarAsync(int id, Produto produtoAtualizado)
     {
         var produtoExistente = await _context.Produtos.FindAsync(id);
-        
+
         if (produtoExistente == null)
         {
             return null;
@@ -57,5 +57,10 @@ public class ProdutoRepository : IProdutoRepository
         _context.Produtos.Remove(produtoExistente);
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<bool> ExisteNomeDuplicadoAsync(string nome)
+    {
+        return await _context.Produtos.AnyAsync(p => p.Nome == nome);
     }
 }
